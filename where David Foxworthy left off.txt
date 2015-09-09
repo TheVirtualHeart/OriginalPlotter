@@ -1,0 +1,12 @@
+plotter.js is more or less at a stable point. I can think of a few improvements that could be made but they would have required more time than I have available. If any problems arise, feel free to contact me at daf8972@g.rit.edu.
+
+I was tasked with a group of four similar apps before leaving full time status on the team.
+These apps are named:
+- noble1d.html
+- brtable1d.html
+- lrtable1d.html
+- lrd1d.html
+
+The first three are more or less complete. The only improvements needed being topical and CSS based.
+
+Overall there is a lack in commenting on some apps, with most commented apps awaiting Elizabeth's comments and questions/review. If there are any questions, you can email me still. Sorry about this bit, the co-op ended before I could finish this batch of 4 apps.

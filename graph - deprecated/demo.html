@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>graph.js demo</title>
+	<script src="graph.js"></script>
+	<script>
+	var graph;
+	
+	function init()
+	{
+		var canvas = document.getElementById("graph");
+		var settings =
+		{
+			domain: new Point(-10, 10),
+			range: new Point(-5, 5),
+			pixelPerUnit: new Point(40, 40),
+			unitPerTick: new Point(1, 1),
+			labelFrequency: new Point(2, 2),
+			xAxis: "x Axis",
+			yAxis: "y Axis"
+		}
+		graph = new Graph(canvas, settings);
+	}
+	
+	window.onload = init;
+	
+	function update()
+	{
+		graph.draw();
+		
+		graph.plotPoint(graph.mouse.move, 5, false);
+		
+		graph.ctx.strokeStyle = "#0000FF";
+		graph.plotLine(graph.mouse.down, graph.mouse.move);
+		
+		graph.ctx.strokeStyle = "#00FF00";
+		var line = graph.plotSlope(graph.mouse.down, -(graph.mouse.move.x - graph.mouse.down.x)/(graph.mouse.move.y - graph.mouse.down.y));
+		
+		graph.ctx.strokeStyle = "#FF0000";
+		graph.plotPoly([line.a, graph.mouse.move, line.b]);
+		
+		graph.ctx.strokeStyle = "#FF00FF";
+		graph.plotFunction(function(x){return Math.sin(x*3) * (x*x*2) / 32;}, true, 0.05);
+	}
+	
+	setInterval(update, 1000/60);
+	</script>
+</head>
+<body>
+	<canvas id="graph">This graph requires HTML5 canvas support, sorry!</canvas>
+</body>
+</html>

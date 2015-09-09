@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>calcium</title>
+	<script src="graph.js"></script>
+	<script>
+	var srGraph, effluxGraph;
+	var n = 30;
+	var influx = 30;
+	var srLine;
+	var srPoints = [];
+	var anchorPoint;
+	var influxSlider, nSlider;
+	
+	function init()
+	{
+		var canvas = document.getElementById("srGraph");
+		var settings =
+		{
+			domain: new Point(0, 100),
+			range: new Point(0, 100),
+			pixelPerUnit: new Point(4, 2),
+			unitPerTick: new Point(20, 25),
+			labelFrequency: new Point(1, 1),
+			xAxis: "SR_i",
+			yAxis: "SR_i+1"
+		};
+		srGraph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("effluxGraph");
+		settings =
+		{
+			domain: new Point(0, 100),
+			range: new Point(0, 100),
+			pixelPerUnit: new Point(4, 2),
+			unitPerTick: new Point(20, 25),
+			labelFrequency: new Point(1, 1),
+			xAxis: "SR_i",
+			yAxis: "Efflux_i"
+		}
+		effluxGraph = new Graph(canvas, settings);
+		
+		influxSlider = document.getElementById("influx");
+		nSlider = document.getElementById("n");
+		
+		document.getElementById("influxDown").addEventListener("click",
+		function()
+		{
+			if(parseInt(influxSlider.value) > parseInt(influxSlider.min))
+				influxSlider.value--;
+		}, false);
+		document.getElementById("influxUp").addEventListener("click",
+		function()
+		{
+			if(parseInt(influxSlider.value) < parseInt(influxSlider.max))
+				influxSlider.value++;
+		}, false);
+		document.getElementById("nDown").addEventListener("click",
+		function()
+		{
+			if(parseInt(nSlider.value) > parseInt(nSlider.min))
+				nSlider.value--
+		;}, false);
+		document.getElementById("nUp").addEventListener("click",
+		function()
+		{
+			if(parseInt(nSlider.value) < parseInt(nSlider.max))
+				nSlider.value++;
+		}, false);
+		
+		setInterval(update, 1000/60);
+	}
+	
+	window.onload = init;
+	
+	function update()
+	{
+		influx = parseInt(influxSlider.value);
+		n = parseInt(nSlider.value);
+		
+		document.getElementById("srEq").innerHTML = "SR<sub>i+1</sub> = SR<sub>i</sub> - Efflux + <strong>influx</strong>; <strong>influx</strong> = <strong>" + influx + "</strong>";
+		document.getElementById("effluxEq").innerHTML = "Efflux = SR * SR<sup><strong>n</strong></sup>/(50<sup><strong>n</strong></sup> + SR<sup><strong>n</strong></sup>); <strong>n</strong> = <strong>" + n + "</strong>";
+		
+		srGraph.draw();
+		srGraph.ctx.strokeStyle = "#0000FF";
+		srLine = srGraph.plotSlope(new Point(0,0), 1);
+		srGraph.ctx.strokeStyle = "#000000";
+		srGraph.plotFunction(sr);
+		
+		if (srGraph.mouse.isDown)
+			anchorPoint = new Point(srGraph.mouse.move.x, srGraph.mouse.move.y);
+		
+		if (anchorPoint != undefined)
+			srPoints = hop(sr, anchorPoint, 100);
+		
+		srGraph.ctx.strokeStyle = "#FF0000";
+		srGraph.plotPoly(srPoints);
+		
+		effluxGraph.draw();
+		effluxGraph.plotFunction(efflux);
+		effluxGraph.plotFunction(sr, false);
+		
+		srPoints.splice(0,1);
+		
+		for (var i = 0; i < srPoints.length; i++)
+		{
+			var p;
+			if (i & 1)
+				p = new Point(srPoints[i].x, srPoints[i - 1].y);
+			else
+				p = new Point(srPoints[i].x, efflux(srPoints[i].x));
+			
+			srPoints[i] = p;
+		}
+		
+		effluxGraph.ctx.strokeStyle = "#00FF00";
+		effluxGraph.plotPoly(srPoints);
+	}
+	function sr(x) { return x - efflux(x) + influx; }
+	function efflux(x) { return x * Math.pow(x, n) / (Math.pow(50, n) + Math.pow(x, n)); }
+	
+	function hop(curve, p, depth)
+	{
+		var points = [new Point(p.x, p.y)]
+		var x = p.x;
+		var y = p.y;
+		
+		for (var i = 0; i < depth; i++)
+		{
+			if (i & 1)
+				x = y - srLine.point.y + srLine.point.x;
+			else
+				y = curve(p.x);
+			p = new Point(x, y);
+			points.push(p);
+		}
+		
+		return points;
+	}
+	</script>
+</head>
+<body>
+	<canvas id="srGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<label id="influxLabel" for="influx"><strong>Influx</strong></label>
+	<button id="influxDown">-</button>
+	<input id="influx" type="range" min="0" max="30" step="1" value="15" />
+	<button id="influxUp">+</button>
+	<div id="srEq"></div>
+	<canvas id="effluxGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<label id="nLabel" for="n"><strong>n</strong></label>
+	<button id="nDown">-</button>
+	<input id="n" type="range" min="0" max="30" step="1" value="15" />
+	<button id="nUp">+</button>
+	<div id="effluxEq"></div>
+</body>
+</html>

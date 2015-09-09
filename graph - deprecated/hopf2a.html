@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>hopf2a</title>
+	<script src="graph.js"></script>
+	<script>
+	var graph, scatter;
+	var lineB;
+	var cutoff = 40;
+	var points = [];
+	
+	function init()
+	{
+		var canvas = document.getElementById("graph");
+		var settings =
+		{
+			domain: new Point(0, 400),
+			range: new Point(0, 300),
+			pixelPerUnit: new Point(1, 1),
+			unitPerTick: new Point(50, 50),
+			labelFrequency: new Point(2, 2),
+			xAxis: "DI (ms)",
+			yAxis: "APD (ms)"
+		};
+		graph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("scatter");
+		settings =
+		{
+			domain: new Point(250, 500),
+			range: new Point(0, 300),
+			pixelPerUnit: new Point(1.5, 1),
+			unitPerTick: new Point(50, 50),
+			labelFrequency: new Point(2, 2),
+			xAxis: "Period (ms)",
+			yAxis: "APD (ms)"
+		}
+		scatter = new Graph(canvas, settings);
+		
+		setInterval(update, 1000/60);
+	}
+	
+	window.onload = init;
+	
+	function update()
+	{
+		graph.draw();
+		
+		graph.plotSlope(graph.mouse.down, -1);
+		graph.plotFunction(curve, true, 1, cutoff);
+		
+		graph.ctx.strokeStyle = "#0000FF";
+		if (graph.mouse.isDown)
+			lineB = graph.plotSlope(graph.mouse.move, -1);
+		else if (lineB != undefined)
+			graph.plotLine(lineB.a, lineB.b);
+		
+		if (lineB != undefined)
+		{
+			graph.ctx.strokeStyle = "#FF0000";
+			var pointsBuffer = hop(graph.mouse.down, 100, 2);
+			graph.plotPoly(pointsBuffer);
+		}
+		
+		scatter.draw();
+		
+		if (pointsBuffer[pointsBuffer.length - 1].x >= cutoff)
+		{
+			var offsetSample = curve(pointsBuffer[pointsBuffer.length - 1].x) == pointsBuffer[pointsBuffer.length - 1].y ? 0 : 1;
+			var newPointA = pointsBuffer[pointsBuffer.length - (3 + offsetSample)];
+			var newPointB = pointsBuffer[pointsBuffer.length - (1 + offsetSample)];
+			newPointA = new Point(newPointA.x + newPointB.y, newPointA.y);
+			newPointB = new Point(newPointB.x + newPointA.y, newPointB.y)
+			
+			if (!isPointPlotted(newPointA) && scatter.pointInBounds(newPointA))
+				points.push(newPointA);
+			if (!isPointPlotted(newPointB) && scatter.pointInBounds(newPointB))
+				points.push(newPointB);
+		}
+		
+		for (var point in points)
+		{
+			scatter.plotPoint(points[point]);
+		}
+		scatter.ctx.strokeStyle = "#FF0000";
+		if (newPointA != undefined)
+			scatter.plotPoint(newPointA, 3, false);
+		if (newPointB != undefined)
+			scatter.plotPoint(newPointB, 3, false);
+	}
+	
+	function curve(x)
+	{
+		var a0 = -647.8;
+		var a1 = 34.1;
+		var a2 = -0.567;
+		var a3 = 0.003349;
+		var a4 = 0;
+		
+		if(x > 65 && x <= 90)
+		{
+			a0 = 837.8;
+			a1 = -34.16;
+			a2 = 0.4834;
+			a3 = -0.002065;
+		}
+		else if(x > 90 && x <= 105.7)
+		{
+			a0 = 565.7;
+			a1 = -21.34;
+			a2 = 0.2987;
+			a3 = -0.001223;
+		}
+		else if(x > 105.7)
+		{
+			a0 = 134.1;
+			a1 = 1.041;
+			a2 = -0.004848;
+			a3 = 1.242e-05;
+			a4 = -1.292e-08;
+		}
+		
+		if(x < 88)
+			return a0 + a1 * x + a2 * Math.pow(x,2) + a3 * Math.pow(x,3) + a4 * Math.pow(x,4);
+		else
+			return 255.377 * (1 - 0.41592 * Math.exp(-x / 149.173) - 298.2 * Math.exp(-x / 11.1681));
+	}
+	
+	function hop(p, depth)
+	{
+		var points = [p]
+		var x = p.x;
+		var y = p.y;
+		
+		for (var i = 0; i < depth; i++)
+		{
+			if (i & 1)
+				x = lineB.point.y - y + lineB.point.x;
+			else
+				y = curve(p.x);
+			p = new Point(x, y);
+			points.push(p);
+			
+			if (x < cutoff)
+			{
+				graph.ctx.font = "32px Helvetica";
+				graph.ctx.textAlign = "center";
+				graph.ctx.textBaseline = "middle";
+				var loc = new Point(graph.settings.domain.x + graph.settings.dimensions.x / 2, graph.settings.range.x + graph.settings.dimensions.y / 2);
+				loc = graph.plotToCanvas(loc);
+				graph.ctx.fillText("Conduction Block", loc.x, loc.y);
+				break;
+			}
+		}
+		
+		return points;
+	}
+	
+	function isPointPlotted(p)
+	{
+		for (var i = 0; i < points.length; i++)
+		{
+			if (p.x == points[i].x && p.y == points[i].y)
+				return true;
+		}
+		return false;
+	}
+	</script>
+</head>
+<body>
+	<canvas id="graph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<canvas id="scatter">This graph requires HTML5 canvas support, sorry!</canvas>
+	<p id="console"></p>
+</body>
+</html>

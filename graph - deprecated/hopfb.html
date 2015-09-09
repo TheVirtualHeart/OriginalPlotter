@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>hopfb</title>
+	<script src="graph.js"></script>
+	<script>
+	var graph;
+	var lineB;
+	var cutoff = 0;
+	
+	function init()
+	{
+		var canvas = document.getElementById("graph");
+		var settings =
+		{
+			domain: new Point(-25, 325),
+			range: new Point(0, 350),
+			pixelPerUnit: new Point(1.25, 1.25),
+			unitPerTick: new Point(50, 50),
+			labelFrequency: new Point(2, 2),
+			xAxis: "DI (ms)",
+			yAxis: "APD (ms)"
+		};
+		graph = new Graph(canvas, settings);
+		setInterval(update, 1000/60);
+	}
+	
+	window.onload = init;
+	
+	function update()
+	{
+		graph.draw();
+		
+		graph.plotSlope(graph.mouse.down, -1);
+		graph.plotFunction(curve, true, 1, cutoff);
+		
+		graph.ctx.strokeStyle = "#0000FF";
+		if (graph.mouse.isDown)
+			lineB = graph.plotSlope(graph.mouse.move, -1);
+		else if (lineB != undefined)
+			graph.plotLine(lineB.a, lineB.b);
+		
+		if (lineB != undefined)
+		{
+			graph.ctx.strokeStyle = "#FF0000";
+			graph.plotPoly(hop(graph.mouse.down, 100, 2));
+		}
+	}
+	
+	function curve(x)
+	{
+		return 0.06 * (1 - 3000 * Math.exp(-x / 50) - 1500 * Math.exp(-x / 10)) + 300 + 50 * Math.exp(-(x - 60) * (x - 60) / 100.0);
+	}
+	
+	function hop(p, depth)
+	{
+		var points = [p]
+		var x = p.x;
+		var y = p.y;
+		
+		for (var i = 0; i < depth; i++)
+		{
+			if (i & 1)
+				x = lineB.point.y - y + lineB.point.x;
+			else
+				y = curve(p.x);
+			p = new Point(x, y);
+			points.push(p);
+			
+			if (x < cutoff)
+			{
+				graph.ctx.font = "32px Helvetica";
+				graph.ctx.fillText("Conduction Block", graph.canvas.width/2, graph.canvas.height/2);
+				break;
+			}
+		}
+		
+		return points;
+	}
+	</script>
+</head>
+<body>
+	<canvas id="graph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<p id="console"></p>
+</body>
+</html>

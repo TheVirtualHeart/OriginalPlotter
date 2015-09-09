@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>alternansmall</title>
+	<script src="plotter.js"></script>
+	<script>
+
+		var app;
+		var debug = [];
+
+		var ueps = 250.0;
+		var eps = 1.0 / ueps;
+		var xm = 10.0;
+		var vstar = 0.64;
+		var s1 = 0.0;						// the first point to introduce voltage
+		var s2 = 300.0;						// the second point to introduce voltage
+		var time = 500.0;					// the time over which we view the function
+		var previousHeaviside = 0;
+		var currentHeaviside = 0;
+
+		var timestep = .25;					// dt - this should be covered by x
+		//var d2 = eps * timestep * 0.5;
+		var curTime = 0.0;					// t - this should be covered by x
+		var voltage = 0.0;					// Vm - the Voltage in the cell 
+		var vgate = 0.0;					// v - the Voltage gate of the cell
+
+		// define the graph
+		function buildGraphs() {
+			app = createPlotter(document.getElementById("plot"));
+
+			app.newPlot({
+				domain: new Point(0, time),
+				range: new Point(0, 4),
+				xAxis: "Time (ms)",
+				yAxis: "V (mv)",
+				labelFrequency: new Point(100, 1),
+				pixelPerUnit: new Point(1, 250),
+				unitPerTick: new Point(1, .1)
+
+			}, "Karma");
+		}
+
+		/**
+		 * a function that draws a graph based on the Karma model
+		 * @param  {[int]} x [the current x value of the function]
+		 * @return {[int]}   [the y value generated based on the x value]
+		 */
+		function karmaGraph(x) {
+
+		    // if the time is either s1 or s2, change the value of Vm to 1.5
+		    if (x == s1 || x == s2) { 
+		    	voltage = 1.5;
+		    }
+
+	        // calculate heaviside of 
+	        previousHeaviside = heaviside(voltage - 1);
+
+		    // Partial derivative of Vm (equation 1)
+		    var gamma = 1.92;
+		    var delta = 0.23;
+		    var alpha = 7.5;
+		    var h = Math.pow(voltage, 2) * (1 - (delta * voltage));
+		    var diffVoltage = (-voltage + (gamma - Math.pow((vgate / vstar), xm)) * h);
+		    voltage += 5 * timestep * diffVoltage / alpha; // don't know why this works
+
+		    var diffVGate = eps * (previousHeaviside - vgate);
+		    vgate += timestep * diffVGate;
+
+		    debug.push({ "time":x, "Vm":voltage, "V":vgate});
+		    
+		    return voltage;
+		}
+
+		/**
+		 * The heaviside function. Return 0 if the expression is negative
+		 * and 1 otherwise
+		 * @param  {int} expression The expression to evaluate
+		 * @return {int} 0 if the expression evaluates to a negative number, 1 otherwise
+		 */
+		function heaviside(expression) {
+			if (expression < 0) {
+				return 0;
+			} else {
+				return 1;
+			}
+		}
+
+		/**
+		 * Initialize the graph and attach event listeners when
+		 * the form loads
+		 */
+		window.onload = function() {
+			debug = [];
+			buildGraphs();
+			app.selectPlot("Karma");
+			app.plotFunction(karmaGraph, true, timestep);
+
+			document.getElementById("reset").onclick = function() {
+				debug = [];
+				vstar = document.getElementsByName("vstar")[0].value;
+				xm = document.getElementsByName("xm")[0].value;
+				ueps = document.getElementsByName("ueps")[0].value;
+				eps = 1/ueps;
+				s1 = document.getElementsByName("s1")[0].value;
+				s2 = document.getElementsByName("s2")[0].value;
+				time = document.getElementsByName("time")[0].value;
+				app.clearPlot();
+				app.plotFunction(karmaGraph, true, timestep);
+			}
+		}
+
+		function displayTable() {
+			console.table(debug, ["time", "Vm", "V"]);
+		}
+
+
+	</script>
+</head>
+<body>
+	<div id="app">
+		<canvas id="plot">hello</canvas>
+	</div>
+	<div id="controls">
+
+		<label for="vstar">VStar</label>
+		<input type="text" name="vstar" value="0.64" />
+
+		<label for="xm">xm</label>
+		<input type="text" name="xm" value="10.0" />
+
+		<label for="ueps">1/eps</label>
+		<input type="text" name="ueps" value="250" />
+
+		<label for="s1">S1</label>
+		<input type="text" name="s1" value="0.0"/>
+
+		<label for="s2">S2</label>
+		<input type="text" name="s2" value="300.0" />
+
+		<label for="time">time</label>
+		<input type="text" name="time" value="500.0" />
+
+		<button id="reset">Reset</button>
+	</div>
+</body>
+</html>

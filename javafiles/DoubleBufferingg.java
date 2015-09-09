@@ -1,0 +1,83 @@
+//  <applet code="DoubleBufferingg" width="400" height="400"></applet>
+
+import java.applet.*; 
+import java.awt.event.*; 
+import java.awt.*; 
+
+public class DoubleBufferingg extends Applet implements MouseMotionListener 
+{ 
+     // The object we will use to write with instead of the standard screen graphics 
+     Graphics bufferGraphics; 
+     // The image that will contain everything that has been drawn on 
+     // bufferGraphics. 
+     Image offscreen; 
+     // To get the width and height of the applet. 
+     Dimension dim; 
+     int curX, curY; 
+
+  Image img;
+  MediaTracker tr;
+
+     public void init()  
+     { 
+          // We'll ask the width and height by this 
+          dim = getSize(); 
+          // We'll redraw the applet eacht time the mouse has moved. 
+          addMouseMotionListener(this); 
+          setBackground(Color.black); 
+          // Create an offscreen image to draw on 
+          // Make it the size of the applet, this is just perfect larger 
+          // size could slow it down unnecessary. 
+          offscreen = createImage(dim.width,dim.height); 
+          // by doing this everything that is drawn by bufferGraphics 
+          // will be written on the offscreen image. 
+          bufferGraphics = offscreen.getGraphics(); 
+    img = getImage(getCodeBase(), "a.gif");
+     } 
+
+      public void paint(Graphics g)  
+     { 
+          // Wipe off everything that has been drawn before 
+          // Otherwise previous drawings would also be displayed. 
+          bufferGraphics.clearRect(0,0,dim.width,dim.width); 
+          bufferGraphics.setColor(Color.red); 
+          bufferGraphics.drawString("Bad Double-buffered",10,10); 
+          // draw the rect at the current mouse position 
+          // to the offscreen image 
+          bufferGraphics.fillRect(curX,curY,20,20); 
+          // draw the offscreen image to the screen like a normal image. 
+          // Since offscreen is the screen width we start at 0,0. 
+         // g.drawImage(img, 0, 0, this);
+          g.drawImage(offscreen,0,0,this); 
+g.drawImage(img, 0, 0, this);
+     } 
+
+     // Always required for good double-buffering. 
+     // This will cause the applet not to first wipe off 
+     // previous drawings but to immediately repaint. 
+     // the wiping off also causes flickering. 
+     // Update is called automatically when repaint() is called. 
+
+     public void update(Graphics g) 
+     { 
+          paint(g); 
+     } 
+  
+
+     // Save the current mouse position to paint a rectangle there. 
+     // and request a repaint() 
+     public void mouseMoved(MouseEvent evt)  
+     { 
+          curX = evt.getX(); 
+          curY = evt.getY(); 
+          repaint(); 
+     } 
+  
+
+     // The necessary methods. 
+     public void mouseDragged(MouseEvent evt)  
+     { 
+     } 
+
+ } 
+

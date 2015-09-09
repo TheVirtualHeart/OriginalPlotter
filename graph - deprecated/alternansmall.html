@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>alternansmall</title>
+	<script src="graph.js"></script>
+	<script>
+	var vGraph, apdGraph, pGraph, cvGraph, lGraph; //graphs
+	var uNew = [], u = [], v = [], w = [], s = []; //differential equation data
+	var dvt, vlo = -0.2; //used to calculate exponent tables and to access them
+	var dt = 0.15, dx = 0.0479, diffusion = 0.001;
+	var ddtOdx2 = diffusion * dt / (dx * dx); //a constant
+	var table1 = [], table2 = [], table3 = []; //pre-computed exponent values used as lookup tables
+	var cableLength = 195, threshold = 0.25; //length of cable to be simulated and the threshold
+	var batchSize = 32, step = 0, paused = false; //adjust batchSize to adjust speed
+	var periodCounter = 0, period = 297;
+	//analysis variables
+	var ntp = [], tp = [[]], apd1 = [], per1 = [], apd2 = [], per2 = [], cv1 = [], cv2 = [];
+	
+	function init()
+	{
+		buildGraphs(); //build the graphs using the graph.js object
+		buildForm();
+		buildTables(1100); //build tables with a nvt value of 1100
+		resetData(); //initialize the data
+		setInterval(update, 1000/60); //run at 60fps
+	}
+	
+	window.onload = init;
+	
+	function update()
+	{
+		if (paused)
+			return;
+		
+		var uOld = u.slice(); //used for the space time plot
+		for (var b = 0; b < batchSize; b++)
+		{
+			calcData();
+			analyzeData();
+			
+			step++;
+			u = uNew.slice();
+		
+			periodCounter++;
+			if (periodCounter >= period / dt)
+			{
+				stimulate();
+				periodCounter = 0;
+			}
+		}
+		
+		pGraph.settings.range = new Point(period - 4, period + 4);
+		graphData(uOld);
+	}
+	
+	function calcData()
+	{
+		for (var i = 0; i < cableLength; i++)
+		{
+			var wIndex = Math.floor((w[i] - vlo) / dvt);
+			var vIndex = Math.floor((u[i] - vlo) / dvt);
+			var um = 0.3, up = 0.13, uq = 0.2, ur = 0.006;
+			var xm = u[i] > um ? 1:0;
+			var xp = u[i] > up ? 1:0;
+			var xq = u[i] > uq ? 1:0;
+			var xr = u[i] > ur ? 1:0;
+			var tvm1 = 20, tvm2 = 20, twm = 50;
+			var tvm = (1 - xq) * tvm1 + xq * tvm2;
+			
+			if (w[i] > 0.45)
+				twm = 180;
+			else if (w[i] > 0.4)
+				twm = 92;
+			else if (w[i] > 0.14)
+				twm = table1[wIndex];
+			
+			var ts1 = 1, ts2 = 1.7721446, to1 = 600, to2 = 20;
+			var ts = (1 - xp) * ts1 + xp * ts2;
+			var to = (1 - xr) * to1 + xr * to2;
+			var vin = 1 - xq, twinf = 9.397222, winfast = 2.8725006;
+			var win = Math.min((1 - xr) * (1 - u[i] / twinf) + xr * winfast, 1);
+			var tvp = 1.4506, twp = 67.880750;
+			var dv = (1 - xm) * (vin - v[i]) / tvm - xm * v[i] / tvp;
+			var dw = (1 - xp) * (win - w[i]) / twm - xp * w[i] / twp;
+			var ds = (table3[vIndex] - s[i]) / ts;
+			v[i] += dt * dv;
+			w[i] += dt * dw;
+			s[i] += dt * ds;
+			var uu = 1.56, tfi = 0.104, uo = 0, tsi = 1.3459624;
+			var tso = table2[vIndex];
+			var xfi = -v[i] * xm * (u[i] - um) * (uu - u[i]) / tfi;
+			var xso = (u[i] - uo) * (1 - xp) / to + xp / tso;
+			var xsi = -xp * w[i] * s[i] / tsi;
+			
+			if (i == 0)
+				uNew[i] = 2 * u[1] - 2 * u[0];
+			else if (i == cableLength - 1)
+				uNew[i] = 2 * u[i - 1] - 2 * u[i];
+			else
+				uNew[i] = u[i + 1] + u[i - 1] - 2 * u[i];
+			
+			uNew[i] = u[i] + ddtOdx2 * uNew[i] - dt * (xfi + xso + xsi);
+		}
+	}
+	
+	function analyzeData()
+	{
+		for (var i = 0; i < cableLength; i++)
+		{
+			if ((u[i] - threshold) * (uNew[i] - threshold) < 0)
+			{
+				ntp[i]++;
+				tp[i][ntp[i]] = step * dt - ((u[i] - threshold) / (uNew[i] - u[i])) * dt;
+				
+				switch (ntp[i])
+				{
+					case 1:
+						if (i != 0)
+							cv1[i] = (dx) / (tp[i][5] - tp[i - 1][5]);
+						break;
+					case 2:
+						apd1[i] = tp[i][2] - tp[i][1];
+						break;
+					case 3:
+						per2[i] = tp[i][3] - tp[i][1];
+						if (i != 0)
+							cv2[i] = (dx) / (tp[i][3] - tp[i - 1][3]);
+						break;
+					case 4:
+						apd2[i] = tp[i][4] - tp[i][3];
+						break;
+					case 5:
+						per1[i] = tp[i][5] - tp[i][3];
+						if (i != 0)
+							cv1[i] = (dx) / (tp[i][5] - tp[i - 1][5]);
+						ntp[i] = 1;
+						tp[i][1] = tp[i][5];
+						break;
+					default:
+						break;
+				}
+			}
+		}
+	}
+	
+	function graphData(uOld)
+	{
+		vGraph.draw();
+		vGraph.plotFunction(function(x){return u[getIndex(x)] * 80 - 80;}, true, getStep());
+		vGraph.plotFunction(function(x)
+		{
+			if (ntp[getIndex(x)] == 1)
+				vGraph.ctx.strokeStyle = "#FF9900";
+			else if (ntp[getIndex(x)] == 3)
+				vGraph.ctx.strokeStyle = "#0099FF";
+			return (ntp[getIndex(x)] == 1 || ntp[getIndex(x)] == 3) ? threshold * 80 - 80 : undefined;
+		}, true, getStep());
+		
+		apdGraph.draw();
+		apdGraph.ctx.strokeStyle = "#FF9900";
+		apdGraph.plotFunction(function(x){return apd1[getIndex(x)];}, true, getStep());
+		apdGraph.ctx.strokeStyle = "#0099FF";
+		apdGraph.plotFunction(function(x){return apd2[getIndex(x)];}, true, getStep());
+		
+		pGraph.draw();
+		pGraph.ctx.strokeStyle = "#FF9900";
+		pGraph.plotFunction(function(x){return per1[getIndex(x)];}, true, getStep());
+		pGraph.ctx.strokeStyle = "#0099FF";
+		pGraph.plotFunction(function(x){return per2[getIndex(x)];}, true, getStep());
+		
+		
+		cvGraph.draw();
+		cvGraph.ctx.strokeStyle = "#FF9900";
+		cvGraph.plotFunction(function(x){return cv1[getIndex(x)] * 1000;}, true, getStep());
+		cvGraph.ctx.strokeStyle = "#0099FF";
+		cvGraph.plotFunction(function(x){return cv2[getIndex(x)] * 1000;}, true, getStep());
+		
+		lGraph.ctx.lineWidth = 1.35;
+		lGraph.ctx.lineCap = "round";
+		for (var i = cableLength - 1; i >= 0; i-=2) //every 2 points, to de-cluster data
+		{
+			if (ntp[i] == 1 || ntp[i] == 2)
+				lGraph.ctx.strokeStyle = "#FF9900";
+			else
+				lGraph.ctx.strokeStyle = "#0099FF";
+			var x1 = (step * dt) % lGraph.settings.domain.y;
+			var x2 = ((step+1) * dt) % lGraph.settings.domain.y;
+			var offset = (cableLength - 1 - i) * dx
+			lGraph.plotLine(new Point(x1, u[i] + offset), new Point(x2, uOld[i] + offset));
+		}
+		if (x1 > ((step + batchSize) * dt) % lGraph.settings.domain.y)
+			lGraph.draw();
+	}
+	
+	function stimulate(strength, location, width)
+	{
+		strength = typeof strength !== "undefined" ? strength : 1;
+		location = typeof location !== "undefined" ? location : 0;
+		width = typeof width !== "undefined" ? width : 1;
+		for (var i = location; i < location + width; i++)
+		{
+				u[i] = strength;
+				ntp[i]++;
+				tp[i][ntp[i]] = step * dt;
+				
+				switch (ntp[i])
+				{
+					case 1:
+						if (i != 0)
+							cv1[i] = (dx) / (tp[i][5] - tp[i - 1][5]);
+						break;
+					case 3:
+						per1[i] = tp[i][3] - tp[i][1];
+						if (i != 0)
+							cv2[i] = (dx) / (tp[i][3] - tp[i - 1][3]);
+						break;
+					case 5:
+						per2[i] = tp[i][5] - tp[i][3];
+						if (i != 0)
+							cv1[i] = (dx) / (tp[i][5] - tp[i - 1][5]);
+						ntp[i] = 1;
+						tp[i][1] = tp[i][5];
+						break;
+					default:
+						break;
+				}
+		}
+	}
+	
+	//tanh is preferred, but not yet supported in IE (via ecmascript 6 proposal)
+	//exponential equations to represent the tanh used instead
+	function buildTables(nvt)
+	{
+		var vhi = 2, vv, tso1 = 200, tso2 = 0.54494910, us = 0.86854118, uso = 0.34233130, xks = 3.2239589, xkso = 2.7969265;
+		dvt = (vhi - vlo) / nvt;
+		for (var i = 0; i < nvt; i++)
+		{
+			vv = vlo + dvt * i;
+			table1[i] = 97 + (170 - 97) * (1 - ((Math.exp((vv - 0.325) * 20) - Math.exp(-(vv - 0.325) * 20)) / (Math.exp((vv - 0.325) * 20) + Math.exp(-(vv - 0.325) * 20)))) / 2;
+			table2[i] = tso1 + (tso2 - tso1) * (1 + ((Math.exp((vv - uso) * xkso) - Math.exp(-(vv - uso) * xkso)) / (Math.exp((vv - uso) * xkso) + Math.exp(-(vv - uso) * xkso)))) / 2;
+			table3[i] = (1 + ((Math.exp((vv - us) * xks) - Math.exp(-(vv - us) * xks)) / (Math.exp((vv - us) * xks) + Math.exp(-(vv - us) * xks)))) / 2;
+		}
+	}
+	
+	function resetData()
+	{
+		for (var i = 0; i < cableLength; i++)
+		{
+			u[i] = i == 0 ? 1 : 0;
+			v[i] = 1;
+			w[i] = 1;
+			s[i] = 0;
+			//analysis variables
+			ntp[i] = i == 0 ? 1 : 0;
+			tp[i] = [];
+			tp[0][ntp[i]] = step * dt;
+			apd1[i]=0;
+			apd2[i]=0;
+			per1[i]=297;
+			per2[i]=297;
+			cv1[i]=0;
+			cv2[i]=0;
+		}
+		vGraph.draw();
+		apdGraph.draw();
+		pGraph.draw();
+		cvGraph.draw();
+		lGraph.draw();
+		step = 0;
+		periodCounter = 0;
+	}
+	
+	function getIndex(value) { return Math.round((value / ((cableLength - 1) * dx + 1.5)) * cableLength); }
+	
+	function getStep() { return ((cableLength - 1) * dx + 1.5) / cableLength; }
+	
+	function buildGraphs()
+	{
+		var canvas = document.getElementById("vGraph");
+		var settings =
+		{
+			domain: new Point(0, (cableLength - 1) * dx + 1.5),
+			range: new Point(-90, 38),
+			pixelPerUnit: new Point((cableLength - 1) * 1.5 / ((cableLength - 1) * dx + 1.5), 1.5),
+			unitPerTick: new Point(1, 20),
+			labelFrequency: new Point(1, 1),
+			xAxis: "Space (cm)",
+			yAxis: "V (mV)",
+			drawCoords: false,
+			zeroBoundAxis: false
+		}
+		vGraph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("apdGraph");
+		settings =
+		{
+			domain: new Point(0, (cableLength - 1) * dx + 1.5),
+			range: new Point(50, 180),
+			pixelPerUnit: new Point((cableLength - 1) * 1.5 / ((cableLength - 1) * dx + 1.5), 2),
+			unitPerTick: new Point(1, 10),
+			labelFrequency: new Point(1, 2),
+			xAxis: "Space (cm)",
+			yAxis: "APD (ms)",
+			drawCoords: false
+		}
+		apdGraph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("pGraph");
+		settings =
+		{
+			domain: new Point(0, (cableLength - 1) * dx + 1.5),
+			range: new Point(293, 301),
+			pixelPerUnit: new Point((cableLength - 1) * 1.5 / ((cableLength - 1) * dx + 1.5), 10),
+			unitPerTick: new Point(1, 2),
+			labelFrequency: new Point(1, 2),
+			xAxis: "Space (cm)",
+			yAxis: "Period (ms)",
+			drawCoords: false
+		}
+		pGraph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("cvGraph");
+		settings =
+		{
+			domain: new Point(0, (cableLength - 1) * dx + 1.5),
+			range: new Point(40, 48),
+			pixelPerUnit: new Point((cableLength - 1) * 1.5 / ((cableLength - 1) * dx + 1.5), 20),
+			unitPerTick: new Point(1, 1),
+			labelFrequency: new Point(1, 2),
+			xAxis: "Space (cm)",
+			yAxis: "CV (cm/s)",
+			drawCoords: false
+		}
+		cvGraph = new Graph(canvas, settings);
+		
+		canvas = document.getElementById("lGraph");
+		settings =
+		{
+			domain: new Point(0, 3000),
+			range: new Point(0, (cableLength - 1) * dx + 1.5),
+			pixelPerUnit: new Point(0.2, (cableLength - 1) * 2 / ((cableLength - 1) * dx + 1.5)),
+			unitPerTick: new Point(250, 1),
+			labelFrequency: new Point(1, 1),
+			xAxis: "Time (ms)",
+			yAxis: "Space (cm)",
+			drawCoords: false
+		}
+		lGraph = new Graph(canvas, settings);
+	}
+	
+	function buildForm()
+	{
+		var speedSlider = document.getElementById("speed");
+		document.getElementById("speedLabel").innerHTML = "<strong>Speed: " + batchSize + "</strong>";
+		speedSlider.value = 32;
+		
+		function updateSpeed(speed)
+		{
+			if (speed == batchSize)
+				return;
+			
+			speedSlider.value = speed;
+			document.getElementById("speedLabel").innerHTML = "<strong>Speed: " + speed + "</strong>";
+			batchSize = speed;
+		}
+		speedSlider.addEventListener("input",
+		function()
+		{
+			updateSpeed(parseInt(speedSlider.value));
+		}, false);
+		document.getElementById("speedDown").addEventListener("click",
+		function()
+		{
+			if(parseInt(speedSlider.value) > parseInt(speedSlider.min))
+				speedSlider.value--;
+			updateSpeed(parseInt(speedSlider.value));
+		}, false);
+		document.getElementById("speedUp").addEventListener("click",
+		function()
+		{
+			if(parseInt(speedSlider.value) < parseInt(speedSlider.max))
+				speedSlider.value++;
+			updateSpeed(parseInt(speedSlider.value));
+		}, false);
+		
+		document.getElementById("reset").addEventListener("click", resetData, false);
+		
+		var pauseButton = document.getElementById("pause");
+		pauseButton.addEventListener("click",
+		function()
+		{
+			paused = !paused;
+			pauseButton.innerHTML = paused ? "UnPause" : "Pause";
+		}, false);
+		
+		var periodList = document.getElementById("periods");
+		periodList.value = 297;
+		periodList.addEventListener("change",
+		function()
+		{
+			period = parseInt(periodList.value);
+			
+			if (document.getElementById("clearPeriod").checked)
+				resetData();
+		}, false);
+		document.getElementById("clearPeriod").checked = false;
+	}
+	</script>
+</head>
+<body>
+	<canvas id="vGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<canvas id="apdGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<canvas id="pGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<canvas id="cvGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<canvas id="lGraph">This graph requires HTML5 canvas support, sorry!</canvas>
+	<label id="speedLabel" for="speedDown"><strong>Speed</strong></label>
+	<button id="speedDown">Slower</button>
+	<input id="speed" type="range" min="1" max="128" step="1" value="32" />
+	<button id="speedUp">Faster</button>
+	<button id="reset">Reset</button>
+	<button id="pause">Pause</button>
+	<label id="periodsLabel" for="periods"><strong>Periods</strong></label>
+	<select id="periods">
+		<option value="297">297</option>
+		<option value="205.5">205.5</option>
+		<option value="165">165</option>
+		<option value="150">150</option>
+		<option value="135">135</option>
+	</select>
+	<label id="clearPeriodLabel" for="clearPeriod"><strong>Reset After Period Change</strong></label>
+	<input id="clearPeriod" type="checkbox" />
+</body>
+</html>
