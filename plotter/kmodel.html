@@ -6,6 +6,10 @@
 	<script src="../node_modules/plotter/plotter.js"></script>
 	<script>
 
+		/**************************************************
+		 VARIABLES
+		 define global variables here
+		 **************************************************/
 		var app;
 		var debug = [];
 
@@ -20,7 +24,7 @@
 		var currentHeaviside = 0;
 
 		var timestep = .25;					// dt - this should be covered by x
-		var startTime = 0;
+		var voltageHeight = 4;
 
 		var curTime = 0.0;					// t - this should be covered by x
 		var voltage = 0.0;					// Vm - the Voltage in the cell 
@@ -29,13 +33,21 @@
 		var vValues = [];
 		var vmValues = [];
 
-		// define the graph
+
+		/**************************************************
+		 PAGE FUNCTIONS	
+		 declare functions that initialize the page here
+		 **************************************************/
+
+		/**
+		 * Initialize the Plotter and define any graphs we want to appear on it
+		 */
 		function buildGraphs() {
 			app = createPlotter(document.getElementById("plot"));
 
 			app.newPlot({
 				domain: new Point(0, time),
-				range: new Point(0, 4),
+				range: new Point(0, voltageHeight),
 				xAxis: "Time (ms)",
 				yAxis: "V (mv)",
 				labelFrequency: new Point(1, 1),
@@ -46,50 +58,132 @@
 		}
 
 
+		/** 
+		 * Wire the form event handlers
+		 */
 		function buildForms() {
-
-			document.getElementById("reset").onclick = function() {
-				debug = [];
-				vstar = document.getElementsByName("vstar")[0].value;
-				xm = document.getElementsByName("xm")[0].value;
-				ueps = document.getElementsByName("ueps")[0].value;
-				eps = 1/ueps;
-				s1 = document.getElementsByName("s1")[0].value;
-				s2 = document.getElementsByName("s2")[0].value;
-				time = document.getElementsByName("time")[0].value;
-
-				app.clearPlot();
-				update();
-				//app.plotFunction(karmaGraph, true, timestep);
-			}
-
-			document.getElementById("default").onclick = function() {
-				ueps = 250.0;
-				eps = 1.0 / ueps;
-				xm = 10.0;
-				vstar = 0.64;
-				s1 = 0.0;						// the first point to introduce voltage
-				s2 = 300.0;						// the second point to introduce voltage
-				time = 500.0;					// the time over which we view the function
-				previousHeaviside = 0;
-				currentHeaviside = 0;
-
-				timestep = .25;					// dt - this should be covered by x
-				startTime = 0;
-
-				curTime = 0.0;					// t - this should be covered by x
-				voltage = 0.0;					// Vm - the Voltage in the cell 
-				vgate = 0.0;
-			}
+			document.getElementById("reset").onclick = resetGraph;
+			document.getElementById("default").onclick = setDefaults;
 		}
 
+		/**
+		 * Reset the graph with the given form values
+		 */
+		function resetGraph() {
+			debug = [];
+			vstar = document.getElementsByName("vstar")[0].value;
+			xm = document.getElementsByName("xm")[0].value;
+			ueps = document.getElementsByName("ueps")[0].value;
+			eps = 1/ueps;
+			s1 = document.getElementsByName("s1")[0].value;
+			s2 = document.getElementsByName("s2")[0].value;
+			time = document.getElementsByName("time")[0].value;
 
+			app.clearPlot();
+			update();
+		}
+
+		/** 
+		 * Reset the form with the default values
+		 */
+		function setDefaults() {
+			ueps = 250.0;
+			eps = 1.0 / ueps;
+			xm = 10.0;
+			vstar = 0.64;
+			s1 = 0.0;						// the first point to introduce voltage
+			s2 = 300.0;						// the second point to introduce voltage
+			time = 500.0;					// the time over which we view the function
+			previousHeaviside = 0;
+			currentHeaviside = 0;
+
+			timestep = .25;					// dt - this should be covered by x
+			startTime = 0;
+
+			curTime = 0.0;					// t - this should be covered by x
+			voltage = 0.0;					// Vm - the Voltage in the cell 
+			vgate = 0.0;
+
+			// update the form to reflect the changes
+			document.getElementsByName("vstar")[0].value = vstar;
+			document.getElementsByName("xm")[0].value = xm;
+			document.getElementsByName("ueps")[0].value = ueps;
+			document.getElementsByName("s1")[0].value = s1;
+			document.getElementsByName("s2")[0].value = s2;
+			document.getElementsByName("time")[0].value = time;
+
+			app.clearPlot();
+			update();
+		}
+
+		/**
+		 * Update the graph and redraw all of the plots
+		 */
+		var count = 0;
+		function update() {
+			console.log(count);
+			count++;
+			app.selectPlot("Karma");
+
+			// display vgate
+			voltage = 0.0;
+			vgate = 0.0;
+			app.plotFunction(calculateVGate, true, timestep);
+
+			// display voltage
+			voltage = 0.0;
+			vgate = 0.0;
+			app.plotFunction(calculateVoltage, true, timestep);
+
+			// display s1
+			var p1 = new Point(s1, 0),
+				p2 = new Point(s1, voltageHeight);
+			app.ctx.strokeStyle = "#000000";
+			app.plotLine(p1, p2);
+
+			
+
+			// display s2
+			var p1 = new Point(s2, 0),
+				p2 = new Point(s2, voltageHeight);
+			app.ctx.strokeStyle = "#000000";
+			app.plotLine(p1, p2);
+
+			//window.requestAnimationFrame(update);		
+		}
+
+		/**
+		 * Initialize the graph and attach event listeners when
+		 * the form loads
+		 */
+		window.onload = function() {
+			debug = [];
+			buildGraphs();
+			buildForms();
+			update();
+
+			//setInterval(update, 1000/60);
+			//requestAnimationFrame(update);
+		}
+
+		/**
+		 * Debug function. Display a table containing the values that are being displayed
+		 */
+		function displayTable() {
+			console.table(debug, ["time", "Vm", "V"]);
+		}
+
+		/**************************************************
+		 GRAPH FUNCTIONS	
+		 declare functions that control the behavior of the
+		 graphs here
+		 **************************************************/
 		/**
 		 * a function that draws a graph based on the Karma model
 		 * @param  {[int]} x [the current x value of the function]
 		 * @return {[int]}   [the y value generated based on the x value]
 		 */
-		function karmaGraph(x) {
+		function calculateKarma(x) {
 
 		    // if the time is either s1 or s2, change the value of Vm to 1.5
 		    if (x == s1 || x == s2) { 
@@ -115,15 +209,25 @@
 		    return { "voltage": voltage, "vgate": vgate };
 		}
 
+		/**
+		 * graph the VGate value from the calculateKarma function
+		 * @param  {[int]} x [the current x value of the function]
+		 * @return {[int]}   [the y value generated based on the x value]
+		 */
 		function calculateVGate(x) {
 			
-		    var vgate = karmaGraph(x)["vgate"];
+		    var vgate = calculateKarma(x)["vgate"];
 		    app.ctx.strokeStyle = "#00FF00";
 		    return vgate;
 		}
 
+		/**
+		 * graph the Voltage value from the calculateKarma function
+		 * @param  {[int]} x [the current x value of the function]
+		 * @return {[int]}   [the y value generated based on the x value]
+		 */
 		function calculateVoltage(x) {
-			var voltage = karmaGraph(x)["voltage"];
+			var voltage = calculateKarma(x)["voltage"];
 			app.ctx.strokeStyle = "#FF0000";
 			return voltage;
 		}
@@ -143,50 +247,38 @@
 			}
 		}
 
-		var count = 0;
-		function update() {
-			console.log(count);
-			count++;
-			app.selectPlot("Karma");
-
-			voltage = 0.0;
-			vgate = 0.0;
-			app.plotFunction(calculateVGate, true, timestep);
-
-
-			voltage = 0.0;
-			vgate = 0.0;
-			app.plotFunction(calculateVoltage, true, timestep);
-
-			//window.requestAnimationFrame(update);		
-		}
-
-		/**
-		 * Initialize the graph and attach event listeners when
-		 * the form loads
-		 */
-		window.onload = function() {
-			debug = [];
-			buildGraphs();
-			buildForms();
-			update();
-
-			//setInterval(update, 1000/60);
-			//requestAnimationFrame(update);
-		}
-
-		function displayTable() {
-			console.table(debug, ["time", "Vm", "V"]);
-		}
-
 
 	</script>
+	<style>
+		#controls {
+			font-family:helvetica;
+		}
+
+		#controls label {
+			display: block;
+			font-weight: bold;
+		}
+
+		#controls button {
+			border: none;
+			outline: none;
+			background-color: #448FCE;
+			color: white;
+		}
+	</style>
 </head>
 <body>
 	<div id="app">
 		<canvas id="plot">hello</canvas>
 	</div>
-	<div id="controls">
+	<div id="controls" style="border:1px solid black">
+
+		<div>
+			<span><strong>Vm:</strong> -Vm + [gamma - (v/v*)<sup>xm</sup>] * h(Vm)</span><br />
+			<span><strong>h(Vm)</strong>: [Vm<sup>2</sup> - (delta * Vm<sup>3</sup>)]/alpha</span><br />
+			<span><strong>V:</strong> epsilon(Theta(Vm - 1) - v)</span><br />
+		</div>
+		<hr />
 
 		<label for="vstar">VStar</label>
 		<input type="text" name="vstar" value="0.64" />
