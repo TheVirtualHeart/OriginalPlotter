@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8" />
-	<title>alternansmall</title>
-	<script src="plotter.js"></script>
+	<title>Karma Model</title>
+	<script src="../node_modules/plotter/plotter.js"></script>
 	<script>
 
 		var app;
@@ -20,10 +20,14 @@
 		var currentHeaviside = 0;
 
 		var timestep = .25;					// dt - this should be covered by x
-		//var d2 = eps * timestep * 0.5;
+		var startTime = 0;
+
 		var curTime = 0.0;					// t - this should be covered by x
 		var voltage = 0.0;					// Vm - the Voltage in the cell 
 		var vgate = 0.0;					// v - the Voltage gate of the cell
+
+		var vValues = [];
+		var vmValues = [];
 
 		// define the graph
 		function buildGraphs() {
@@ -34,12 +38,51 @@
 				range: new Point(0, 4),
 				xAxis: "Time (ms)",
 				yAxis: "V (mv)",
-				labelFrequency: new Point(100, 1),
-				pixelPerUnit: new Point(1, 250),
-				unitPerTick: new Point(1, .1)
+				labelFrequency: new Point(1, 1),
+				pixelPerUnit: new Point(1, 100),
+				unitPerTick: new Point(50, .5)
 
 			}, "Karma");
 		}
+
+
+		function buildForms() {
+
+			document.getElementById("reset").onclick = function() {
+				debug = [];
+				vstar = document.getElementsByName("vstar")[0].value;
+				xm = document.getElementsByName("xm")[0].value;
+				ueps = document.getElementsByName("ueps")[0].value;
+				eps = 1/ueps;
+				s1 = document.getElementsByName("s1")[0].value;
+				s2 = document.getElementsByName("s2")[0].value;
+				time = document.getElementsByName("time")[0].value;
+
+				app.clearPlot();
+				update();
+				//app.plotFunction(karmaGraph, true, timestep);
+			}
+
+			document.getElementById("default").onclick = function() {
+				ueps = 250.0;
+				eps = 1.0 / ueps;
+				xm = 10.0;
+				vstar = 0.64;
+				s1 = 0.0;						// the first point to introduce voltage
+				s2 = 300.0;						// the second point to introduce voltage
+				time = 500.0;					// the time over which we view the function
+				previousHeaviside = 0;
+				currentHeaviside = 0;
+
+				timestep = .25;					// dt - this should be covered by x
+				startTime = 0;
+
+				curTime = 0.0;					// t - this should be covered by x
+				voltage = 0.0;					// Vm - the Voltage in the cell 
+				vgate = 0.0;
+			}
+		}
+
 
 		/**
 		 * a function that draws a graph based on the Karma model
@@ -69,8 +112,22 @@
 
 		    debug.push({ "time":x, "Vm":voltage, "V":vgate});
 		    
-		    return voltage;
+		    return { "voltage": voltage, "vgate": vgate };
 		}
+
+		function calculateVGate(x) {
+			
+		    var vgate = karmaGraph(x)["vgate"];
+		    app.ctx.strokeStyle = "#00FF00";
+		    return vgate;
+		}
+
+		function calculateVoltage(x) {
+			var voltage = karmaGraph(x)["voltage"];
+			app.ctx.strokeStyle = "#FF0000";
+			return voltage;
+		}
+
 
 		/**
 		 * The heaviside function. Return 0 if the expression is negative
@@ -86,6 +143,24 @@
 			}
 		}
 
+		var count = 0;
+		function update() {
+			console.log(count);
+			count++;
+			app.selectPlot("Karma");
+
+			voltage = 0.0;
+			vgate = 0.0;
+			app.plotFunction(calculateVGate, true, timestep);
+
+
+			voltage = 0.0;
+			vgate = 0.0;
+			app.plotFunction(calculateVoltage, true, timestep);
+
+			//window.requestAnimationFrame(update);		
+		}
+
 		/**
 		 * Initialize the graph and attach event listeners when
 		 * the form loads
@@ -93,21 +168,11 @@
 		window.onload = function() {
 			debug = [];
 			buildGraphs();
-			app.selectPlot("Karma");
-			app.plotFunction(karmaGraph, true, timestep);
+			buildForms();
+			update();
 
-			document.getElementById("reset").onclick = function() {
-				debug = [];
-				vstar = document.getElementsByName("vstar")[0].value;
-				xm = document.getElementsByName("xm")[0].value;
-				ueps = document.getElementsByName("ueps")[0].value;
-				eps = 1/ueps;
-				s1 = document.getElementsByName("s1")[0].value;
-				s2 = document.getElementsByName("s2")[0].value;
-				time = document.getElementsByName("time")[0].value;
-				app.clearPlot();
-				app.plotFunction(karmaGraph, true, timestep);
-			}
+			//setInterval(update, 1000/60);
+			//requestAnimationFrame(update);
 		}
 
 		function displayTable() {
@@ -142,6 +207,7 @@
 		<input type="text" name="time" value="500.0" />
 
 		<button id="reset">Reset</button>
+		<button id="default">Defaults</button>
 	</div>
 </body>
 </html>
