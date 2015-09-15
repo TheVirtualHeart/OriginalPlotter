@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8" />
 	<title>Karma Model</title>
-	<script src="../node_modules/plotter/plotter.js"></script>
+	<script src="node_modules/plotter/plotter.js"></script>
 	<script>
 
 		/**************************************************
@@ -33,6 +33,8 @@
 		var vValues = [];
 		var vmValues = [];
 
+		var displayV = true;
+		var displayVm = true;
 
 		/**************************************************
 		 PAGE FUNCTIONS	
@@ -78,6 +80,9 @@
 			s1 = numericValue(document.getElementsByName("s1")[0].value);
 			s2 = numericValue(document.getElementsByName("s2")[0].value);
 			time = numericValue(document.getElementsByName("time")[0].value);
+
+			displayVm = document.getElementsByName("displayVm")[0].checked;
+			displayV = document.getElementsByName("displayV")[0].checked;
 
 			update();
 		}
@@ -141,14 +146,18 @@
 
 
 			// display vgate
-			voltage = 0.0;
-			vgate = 0.0;
-			app.plotFunction(calculateVGate, true, timestep);
+			if (displayV) {
+				voltage = 0.0;
+				vgate = 0.0;
+				app.plotFunction(calculateVGate, true, timestep);
+			}
 
 			// display voltage
-			voltage = 0.0;
-			vgate = 0.0;
-			app.plotFunction(calculateVoltage, true, timestep);
+			if (displayVm) {
+				voltage = 0.0;
+				vgate = 0.0;
+				app.plotFunction(calculateVoltage, true, timestep);
+			}
 
 			// display s1
 			var p1 = new Point(s1, 0),
@@ -307,6 +316,12 @@
 			<span><strong>V:</strong> epsilon(Theta(Vm - 1) - v)</span><br />
 		</div>
 		<hr />
+
+		<label for="displayV">Display V</label>
+		<input id="displayV" name="displayV" type="checkbox" checked/>
+
+		<label for="displayVm">Display Vm</label>
+		<input id="displayVm" name="displayVm" type="checkbox" checked/>
 
 		<label for="vstar">VStar</label>
 		<input type="text" name="vstar" value="0.64" />
