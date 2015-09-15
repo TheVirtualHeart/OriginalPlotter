@@ -71,15 +71,14 @@
 		 */
 		function resetGraph() {
 			debug = [];
-			vstar = document.getElementsByName("vstar")[0].value;
-			xm = document.getElementsByName("xm")[0].value;
-			ueps = document.getElementsByName("ueps")[0].value;
+			vstar = numericValue(document.getElementsByName("vstar")[0].value);
+			xm = numericValue(document.getElementsByName("xm")[0].value);
+			ueps = numericValue(document.getElementsByName("ueps")[0].value);
 			eps = 1/ueps;
-			s1 = document.getElementsByName("s1")[0].value;
-			s2 = document.getElementsByName("s2")[0].value;
-			time = document.getElementsByName("time")[0].value;
+			s1 = numericValue(document.getElementsByName("s1")[0].value);
+			s2 = numericValue(document.getElementsByName("s2")[0].value);
+			time = numericValue(document.getElementsByName("time")[0].value);
 
-			app.clearPlot();
 			update();
 		}
 
@@ -116,6 +115,16 @@
 			update();
 		}
 
+		function refitPlot() {
+			app.editPlot("Karma",
+			{
+				domain: new Point(0, time),
+				pixelPerUnit: new Point(1/(time/500), 100)
+			},
+			true,
+			true);
+		}
+
 		/**
 		 * Update the graph and redraw all of the plots
 		 */
@@ -123,7 +132,13 @@
 		function update() {
 			console.log(count);
 			count++;
+
+			refitPlot();
+
+			//app.clearPlot();
+
 			app.selectPlot("Karma");
+
 
 			// display vgate
 			voltage = 0.0;
@@ -141,13 +156,18 @@
 			app.ctx.strokeStyle = "#000000";
 			app.plotLine(p1, p2);
 
-			
+			var p = new Point(s1 + 15, 1.5);
+			app.plotText("S1", p);
 
+			
 			// display s2
 			var p1 = new Point(s2, 0),
 				p2 = new Point(s2, voltageHeight);
 			app.ctx.strokeStyle = "#000000";
 			app.plotLine(p1, p2);
+
+			var p = new Point(s2 + 15, 1.5);
+			app.plotText("S2", p);
 
 			//window.requestAnimationFrame(update);		
 		}
@@ -244,6 +264,14 @@
 				return 0;
 			} else {
 				return 1;
+			}
+		}
+
+		function numericValue(value) {
+			if (!isNaN(Number(value))) {
+				return Number(value);
+			} else {
+				return 0;
 			}
 		}
 
