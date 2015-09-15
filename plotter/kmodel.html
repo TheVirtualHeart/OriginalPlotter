@@ -66,6 +66,9 @@
 		function buildForms() {
 			document.getElementById("reset").onclick = resetGraph;
 			document.getElementById("default").onclick = setDefaults;
+
+			document.getElementById("displayVm").onclick = resetGraph;
+			document.getElementById("displayV").onclick = resetGraph;
 		}
 
 		/**
@@ -317,10 +320,10 @@
 		</div>
 		<hr />
 
-		<label for="displayV">Display V</label>
+		<label style="color:green;" for="displayV">Display V</label>
 		<input id="displayV" name="displayV" type="checkbox" checked/>
 
-		<label for="displayVm">Display Vm</label>
+		<label style="color:red;" for="displayVm">Display Vm</label>
 		<input id="displayVm" name="displayVm" type="checkbox" checked/>
 
 		<label for="vstar">VStar</label>
