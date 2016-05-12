@@ -10,3 +10,12 @@ These apps are named:
 The first three are more or less complete. The only improvements needed being topical and CSS based.
 
 Overall there is a lack in commenting on some apps, with most commented apps awaiting Elizabeth's comments and questions/review. If there are any questions, you can email me still. Sorry about this bit, the co-op ended before I could finish this batch of 4 apps.
+
+
+
+
+
+
+/* Rectangle 51: */
+background: #80C7D2;
+box-shadow: 0px 0px 4px 0px #3E888C;
